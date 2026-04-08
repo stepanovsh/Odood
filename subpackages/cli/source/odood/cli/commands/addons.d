@@ -562,6 +562,9 @@ class CommandAddonsUpdate: CommandAddonsUpdateInstallUninstall {
                 "a", "all", "Update all modules"));
         this.add(
             new Flag(
+                "v", "verbose", "Verbose output of addon update process."));
+        this.add(
+            new Flag(
                 null, "installed-only",
                 "Skip addons that are not installed in the database."));
     }
@@ -571,6 +574,12 @@ class CommandAddonsUpdate: CommandAddonsUpdateInstallUninstall {
 
         applyForDatabases(args, project, (in string dbname) {
             checkUnfinishedUpdates(project, dbname, args);
+            bool verbose = false;
+
+            if (args.flag("verbose"))
+                infof("Updating addons in database %s with verbose output enabled", dbname);
+                verbose = true;
+
             if (args.flag("ual"))
                 project.lodoo.addonsUpdateList(dbname, true);
             if (args.flag("all"))
@@ -584,7 +593,7 @@ class CommandAddonsUpdate: CommandAddonsUpdateInstallUninstall {
                 if (addons.empty)
                     infof("No installed addons to update in %s, skipping.", dbname);
                 else
-                    project.addons.update(dbname, addons);
+                    project.addons.update(dbname, addons, verbose: verbose);
             }
             checkUnfinishedUpdates(project, dbname, args);
         });
