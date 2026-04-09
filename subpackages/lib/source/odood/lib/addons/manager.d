@@ -416,8 +416,8 @@ struct AddonManager {
             "--pidfile=",  // We must not write to pidfile to avoid conflicts with running Odoo
         ).withEnv(env);
 
-        if (!verbose)
-            runner.addArgs("--logfile=%s".format(_project.odoo.logfile.toString));
+        // if (!verbose)
+        //    runner.addArgs("--logfile=%s".format(_project.odoo.logfile.toString));
 
         if (!_project.dbSQL(database).hasDemoData)
             runner.addArgs("--without-demo=all");
