@@ -436,6 +436,10 @@ class CommandAddonsUpdateInstallUninstall: OdoodCommand {
         this.add(
             new Flag(
                 null, "start", "Start server after update (if everything is ok)"));
+
+        this.add(
+            new Flag(
+                "v", "verbose", "Verbose output of addon update process."));
     }
 
     /** Check for unfinished addon operations in the database.
@@ -560,9 +564,6 @@ class CommandAddonsUpdate: CommandAddonsUpdateInstallUninstall {
         this.add(
             new Flag(
                 "a", "all", "Update all modules"));
-        this.add(
-            new Flag(
-                "v", "verbose", "Verbose output of addon update process."));
         this.add(
             new Flag(
                 null, "installed-only",
