@@ -9,6 +9,7 @@ private import std.conv: to;
 private import std.format: format;
 private import std.typecons: Nullable, nullable;
 private import std.stdio: File;
+private import std.json: JSONValue;
 
 private import odood.exception: OdoodException;
 
@@ -64,6 +65,17 @@ immutable auto RE_LOG_RECORD_DATA = ctRegex!(
             (msg[0..200] ~ "...") : msg[0..$];
         return "%s %s %s %s %s %s".format(
             date, process_id, log_level, db, logger, msg_truncated);
+    }
+
+    /// JSON representation of this message
+    JSONValue toJSON() const {
+        JSONValue json = JSONValue(["date": JSONValue(date)]);
+        json["process_id"] = JSONValue(process_id);
+        json["log_level"] = JSONValue(log_level);
+        json["db"] = JSONValue(db);
+        json["logger"] = JSONValue(logger);
+        json["msg"] = JSONValue(msg);
+        return json;
     }
 }
 
@@ -293,4 +305,40 @@ unittest {
     records[$-1].msg.shouldEqual(
         "test_onchange_contract_restrict_service_clean_service (odoo.addons.generic_request_contract.tests.test_generic_request_contract_service.TestRequestContractService) ");
     records.length.shouldEqual(15);
+}
+
+/// Test OdooLogRecord.toJSON with special characters
+unittest {
+    import unit_threaded.assertions;
+    import std.json;
+
+    OdooLogRecord rec;
+    rec.date = "2025-01-01 12:00:00,000";
+    rec.process_id = 12345;
+    rec.log_level = "ERROR";
+    rec.db = "mydb";
+    rec.logger = "odoo.test";
+
+    // Test with newlines
+    rec.msg = "Error with newline\nSecond line";
+    auto json = rec.toJSON();
+    auto json_str = json.toJSON();
+
+    // Should be valid JSON
+    auto parsed = parseJSON(json_str);
+    parsed["msg"].str.shouldContain("newline");
+
+    // Test with quotes
+    rec.msg = "Error with \"quotes\" inside";
+    json = rec.toJSON();
+    json_str = json.toJSON();
+    parsed = parseJSON(json_str);
+    parsed["msg"].str.shouldContain("quotes");
+
+    // Test with backslash
+    rec.msg = "Error with \\ backslash";
+    json = rec.toJSON();
+    json_str = json.toJSON();
+    parsed = parseJSON(json_str);
+    parsed["msg"].str.shouldContain("backslash");
 }

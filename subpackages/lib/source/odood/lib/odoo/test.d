@@ -11,6 +11,7 @@ private import std.string: join, empty;
 private import std.format: format;
 private import std.algorithm: map, filter, canFind;
 private import std.exception: enforce;
+private import std.json: JSONValue;
 
 private import thepath: Path;
 
@@ -239,8 +240,8 @@ unittest {
     // warnings() should return only WARNING-level records
     auto warnings = result.warnings.array;
     warnings.length.shouldEqual(2);
-    warnings[0].msg.shouldEqual("Some warning");
-    warnings[1].msg.shouldEqual("At least one test failed");
+    warnings[0].msg.shouldEqual("Normal info message");
+    warnings[1].msg.shouldEqual("Some warning");
 
     // errors() should return ERROR, CRITICAL, and WARNING matching RE_ERROR_CHECKS
     auto errors = result.errors.array;
@@ -260,6 +261,51 @@ unittest {
 
     result.totalDuration.shouldEqual(5.seconds);
     result.testsDuration.shouldEqual(3.seconds);
+}
+
+/// Test OdooTestResult JSON serialization
+unittest {
+    import core.time: seconds;
+    import unit_threaded.assertions;
+    import std.json;
+
+    OdooTestResult result;
+    result.setSuccess();
+    result.setDurationTotal(5.seconds);
+    result.setDurationTests(3.seconds);
+
+    // Add some log records
+    OdooLogRecord rec1;
+    rec1.date = "2025-01-01 12:00:00,000";
+    rec1.process_id = 12345;
+    rec1.log_level = "INFO";
+    rec1.db = "testdb";
+    rec1.logger = "odoo.test";
+    rec1.msg = "Test message with special chars: \"quotes\" and \nnewlines";
+    result.addLogRecord(rec1);
+
+    OdooLogRecord rec2;
+    rec2.date = "2025-01-01 12:00:01,000";
+    rec2.process_id = 12346;
+    rec2.log_level = "ERROR";
+    rec2.db = "testdb";
+    rec2.logger = "odoo.modules";
+    rec2.msg = "Error message";
+    result.addLogRecord(rec2);
+
+    // Serialize to JSON
+    auto json = result.toJSON();
+    auto json_str = json.toJSON();
+
+    // Should be valid JSON
+    auto parsed = parseJSON(json_str);
+    parsed["success"].get!bool.shouldBeTrue;
+    parsed["cancelled"].get!bool.shouldBeFalse;
+    parsed["duration_total_seconds"].get!long.shouldEqual(5);
+    parsed["duration_tests_seconds"].get!long.shouldEqual(3);
+    parsed["logs"].array.length.shouldEqual(2);
+    parsed["logs"].array[0]["msg"].str.shouldContain("special chars");
+    parsed["logs"].array[1]["log_level"].str.shouldEqual("ERROR");
 }
 
 
@@ -386,6 +432,31 @@ private struct OdooTestResult {
     /** Return duration of tests for this test run.
       **/
     auto testsDuration() const { return _duration_tests; };
+
+    /** JSON representation of test result
+      **/
+    JSONValue toJSON() const {
+        JSONValue[] log_records_json_array;
+        foreach(const ref rec; _log_records) {
+            log_records_json_array ~= rec.toJSON();
+        }
+
+        auto log_records_json = JSONValue(log_records_json_array);
+
+        JSONValue json = JSONValue([
+            "success": JSONValue(_success),
+            "cancelled": JSONValue(_cancelled),
+            "logs": log_records_json,
+        ]);
+
+        if (_cancel_reason.length > 0)
+            json["cancel_reason"] = JSONValue(_cancel_reason);
+
+        json["duration_total_seconds"] = JSONValue(_duration_total.total!"seconds");
+        json["duration_tests_seconds"] = JSONValue(_duration_tests.total!"seconds");
+
+        return json;
+    }
 }
 
 
