@@ -19,7 +19,9 @@ private import odood.project:
     Project, OdooInstallType;
 private import odood.project.config: ProjectServerSupervisor;
 private import odood.lib.python.venv: PyInstallType, VenvOptions;
-private import odood.lib.python.odoo: guessVenvOptions;
+private import odood.lib.python.odoo:
+    guessVenvOptions, suggestPythonVersion, getSystemPythonVersion;
+private import versioned: Version;
 private import odood.utils.odoo.serie: OdooSerie;
 private import odood.utils: generateRandomString;
 private import odood.git: GitURL;
@@ -136,6 +138,22 @@ class CommandDeploy: OdoodCommand {
         if (!pyVersion.isNull) {
             config.venv_options.py_version = pyVersion.get;
             config.venv_options.install_type = PyInstallType.Build;
+        } else if (config.venv_options.install_type == PyInstallType.System) {
+            // No explicit --py-version was requested and guessVenvOptions
+            // decided the system Python is "in range" for this Odoo serie.
+            // Prefer the pinned patch release from suggestPythonVersion over
+            // the distro's system Python so deployed images/hosts run a
+            // reproducible interpreter (e.g. ubuntu:24.04 ships 3.12.3 while
+            // Odood pins 3.12.14 for Odoo 18/19). Only switch to a source
+            // build when the versions actually differ, to avoid an
+            // unnecessary CPython build when they already match.
+            immutable suggested = Version(
+                config.odoo.serie.suggestPythonVersion);
+            immutable system_py = config.odoo.serie.getSystemPythonVersion;
+            if (suggested != system_py) {
+                config.venv_options.py_version = suggested.toString;
+                config.venv_options.install_type = PyInstallType.Build;
+            }
         }
         if (!nodeVersion.isNull)
             config.venv_options.node_version = nodeVersion.get;
