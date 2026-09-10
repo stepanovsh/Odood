@@ -301,7 +301,7 @@ The naive approach — manually cherry-picking or re-applying changes — is ted
 
 - Module versions embed the series prefix and must be updated (e.g. `17.0.1.2.3` → `18.0.1.2.3`).
 - Migration script directories also embed the series (e.g. `migrations/17.0.1.2.3/` → `migrations/18.0.1.2.3/`).
-- Translation files in the target branch should be kept as-is — conflicts in `.po`/`.pot` files are meaningless and always resolved in favour of the target branch.
+- Files that belong to the branch itself should be kept as-is — conflicts in translations (`.po`/`.pot`) and in generated per-branch files (`CHANGELOG.md`, `CHANGELOG.latest.md`, `ADDONS.md`, `ADDONS.csv`) are meaningless and always resolved in favour of the target branch.
 
 `odood repo do-forward-port` automates all of this, leaving only genuine business-logic conflicts for you to resolve manually.
 
@@ -319,7 +319,7 @@ The naive approach — manually cherry-picking or re-applying changes — is ted
    ```
    The command will automatically:
    - Fetch `origin/17.0` and open a merge (`--no-ff --no-commit`) into the current branch, staging all changes for review.
-   - Reset `.po`/`.pot` files to the target-branch version — translation conflicts are always discarded.
+   - Reset translations (`.po`/`.pot`) and generated per-branch files (`CHANGELOG.md`, `CHANGELOG.latest.md`, `ADDONS.md`, `ADDONS.csv`) to the target-branch version — such conflicts are always discarded.
    - Fix version number conflicts in each addon's `__manifest__.py`, rewriting the series prefix.
    - Rename migration script directories from the source series to the target series (e.g. `migrations/17.0.1.2.3/` → `migrations/18.0.1.2.3/`).
 
@@ -401,11 +401,14 @@ For deployment context (not CI), see [Docker Compose deployment](./deployment-do
 ### Key concept: the CI image
 
 The `odoo-ci/{serie}` image is a drop-in CI variant of the production image (same
-`--config-from-env` / `ODOOD_OPT_*` mechanism), used by the examples below. It differs in two ways:
+`--config-from-env` / `ODOOD_OPT_*` mechanism), used by the examples below. It differs in three ways:
 
 - **No `HEALTHCHECK`** — the container is a disposable test runner, not a server.
 - **Dev/test tooling pre-installed** (`odood venv install-dev-tools`): `pre-commit`, `eslint`,
   `flake8`, `pylint-odoo`, `coverage`, etc. — so lint and coverage jobs don't reinstall it each run.
+- **Headless browser pre-installed** — Google Chrome, so tours (`HttpCase` / `browser_js` tests)
+  run out of the box. Without a browser on `PATH`, Odoo silently skips them. The Python side
+  (`websocket-client`) comes with the dev tooling above.
 
 > **Tip:** `pre-commit` is baked in, but its hook environments are still built from your repo's
 > `.pre-commit-config.yaml` on first run — cache `~/.cache/pre-commit` between runs.
