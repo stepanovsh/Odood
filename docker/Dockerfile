@@ -22,10 +22,11 @@ RUN apt-get update -qq && \
     locale-gen en_US.UTF-8 && \
     locale-gen en_GB.UTF-8 && \
     update-locale LANG="en_US.UTF-8" && update-locale LANGUAGE="en_US:en" && \
-    echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
-        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | \
-            apt-key add - && \
-	apt-get update -qq && \
+    install -d -m 0755 /etc/apt/keyrings && \
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | \
+        gpg --dearmor -o /etc/apt/keyrings/pgdg.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    apt-get update -qq && \
     apt-get install -qqq -y --no-install-recommends --auto-remove $ODOOD_DEPENDENCIES && \
     wget --quiet -O /tmp/wkhtmltopdf.deb https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.jammy_$(dpkg --print-architecture).deb && \
         dpkg -i /tmp/wkhtmltopdf.deb && \
