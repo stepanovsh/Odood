@@ -1,4 +1,4 @@
-FROM ubuntu:24.04 AS base
+FROM ubuntu:26.04 AS base
 
 ARG ODOO_VERSION
 ARG ODOOD_DEPENDENCIES
@@ -21,7 +21,7 @@ RUN apt-get update -qq && \
         tzdata && \
     locale-gen en_US.UTF-8 && \
     locale-gen en_GB.UTF-8 && \
-    update-locale LANG="en_US.UTF-8" && update-locale LANGUAGE="en_US:en" \
+    update-locale LANG="en_US.UTF-8" && update-locale LANGUAGE="en_US:en" && \
     echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | \
             apt-key add - && \
