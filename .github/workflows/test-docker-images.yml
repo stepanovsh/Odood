@@ -1,0 +1,138 @@
+name: Test Docker images
+
+on:
+  push:
+    paths:
+      - docker/**
+      - nfpm.yaml
+      - .github/dependabot.yml
+      - .github/workflows/publish-dockerimage.yml
+      - .github/workflows/test-docker-images.yml
+      - subpackages/lib/source/odood/lib/python/**
+      - subpackages/project/source/odood/project/install/**
+      - subpackages/cli/source/odood/cli/commands/deploy.d
+  pull_request:
+    paths:
+      - docker/**
+      - nfpm.yaml
+      - .github/dependabot.yml
+      - .github/workflows/publish-dockerimage.yml
+      - .github/workflows/test-docker-images.yml
+      - subpackages/lib/source/odood/lib/python/**
+      - subpackages/project/source/odood/project/install/**
+      - subpackages/cli/source/odood/cli/commands/deploy.d
+
+env:
+  ODOOD_DLANG_COMPILER: ldc-1.43.0
+
+jobs:
+  build-odood:
+    name: Build Odood (${{ matrix.os }})
+    strategy:
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-22.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check architecture
+        id: check-arch
+        run: echo "arch=$(dpkg --print-architecture)" >> "$GITHUB_OUTPUT"
+
+      - name: Install D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ env.ODOOD_DLANG_COMPILER }}
+
+      - name: Cache DUB dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.dub/packages
+          key: dub-${{ runner.os }}-${{ env.ODOOD_DLANG_COMPILER }}-${{ hashFiles('**/dub.selections.json') }}
+          restore-keys: |
+            dub-${{ runner.os }}-${{ env.ODOOD_DLANG_COMPILER }}-
+            dub-${{ runner.os }}-
+
+      - name: Install system dependencies
+        uses: lyricwulf/abc@v1
+        with:
+          linux: libpq-dev python3-dev
+
+      - name: Build Odood
+        run: |
+          dub build -b release-debug --d-version OdoodInDocker
+          dub build -b release-debug --d-version OdoodInDocker -c bash-autocomplete
+          .ci/print_deps.d > build/deb-dependencies.txt
+
+      - name: Upload Odood binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: odood-${{ steps.check-arch.outputs.arch }}
+          path: |
+            build/odood
+            build/odood.bash
+
+      - name: Upload Odood dependencies
+        uses: actions/upload-artifact@v4
+        with:
+          name: odood-deps-${{ steps.check-arch.outputs.arch }}
+          path: build/deb-dependencies.txt
+
+  build-images:
+    name: Build Odoo ${{ matrix.odoo_version }} images
+    needs: build-odood
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        odoo_version:
+          - "16.0"
+          - "17.0"
+          - "18.0"
+          - "19.0"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download amd64 Odood binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: odood-amd64
+          path: docker/bin/amd64
+
+      - name: Download arm64 Odood binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: odood-arm64
+          path: docker/bin/arm64
+
+      - name: Download Odood dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: odood-deps-amd64
+          path: deps
+
+      - name: Make Odood binaries executable
+        run: chmod a+x docker/bin/amd64/odood docker/bin/arm64/odood
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production and CI images for both architectures
+        env:
+          ODOO_VERSION: ${{ matrix.odoo_version }}
+        run: |
+          dependencies="$(tr '\n' ' ' < deps/deb-dependencies.txt)"
+          for target in production ci; do
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --target "$target" \
+              --build-arg "ODOO_VERSION=$ODOO_VERSION" \
+              --build-arg "ODOOD_DEPENDENCIES=$dependencies" \
+              docker
+          done

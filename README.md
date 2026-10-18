@@ -232,7 +232,7 @@ volumes:
 
 services:
     odood-example-db:
-        image: postgres:16
+        image: postgres:18
         container_name: odood-example-db
         environment:
             # Credentials must match ODOOD_OPT_DB_USER / ODOOD_OPT_DB_PASSWORD below.
@@ -242,7 +242,7 @@ services:
             # all Odoo databases must be created by Odoo itself.
             POSTGRES_DB: postgres
         volumes:
-            - odood-example-db-data:/var/lib/postgresql/data
+            - odood-example-db-data:/var/lib/postgresql
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U odoo"]
             interval: 10s

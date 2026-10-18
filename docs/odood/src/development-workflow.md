@@ -464,7 +464,7 @@ jobs:
       image: ghcr.io/katyukha/odood/odoo-ci/18.0:latest
     services:
       postgres:
-        image: postgres:15
+        image: postgres:18
         env:
           POSTGRES_USER: odoo
           POSTGRES_PASSWORD: odoo
@@ -504,7 +504,7 @@ jobs:
       image: ghcr.io/katyukha/odood/odoo-ci/18.0:latest
     services:
       postgres:
-        image: postgres:15
+        image: postgres:18
         env:
           POSTGRES_USER: odoo
           POSTGRES_PASSWORD: odoo
@@ -536,8 +536,8 @@ jobs:
 
 > **Tip:** If your addons have no third-party dependencies, you can omit the "Add dependencies" step and the `odoo_requirements.txt` file.
 
-> **Note:** These examples (and the GitLab CI ones below) use `postgres:15`. Odoo 20 needs
-> PostgreSQL 16 or newer — use `postgres:16` or later for it.
+> **Note:** These examples use `postgres:18` to match the PostgreSQL client in the
+> prebuilt CI image. Odoo 20 needs PostgreSQL 16 or newer.
 
 ---
 
@@ -563,7 +563,7 @@ stages:
 # Shared PostgreSQL sidecar and matching ODOOD_OPT_* variables.
 .with-postgres:
   services:
-    - name: postgres:15
+    - name: postgres:18
       alias: postgres
   variables:
     POSTGRES_USER: odoo

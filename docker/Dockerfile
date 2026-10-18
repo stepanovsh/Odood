@@ -1,4 +1,4 @@
-FROM ubuntu:26.04 AS base
+FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 AS base
 
 ARG ODOO_VERSION
 ARG ODOOD_DEPENDENCIES
@@ -15,19 +15,30 @@ RUN apt-get update -qq && \
         locales \
         wget \
         ca-certificates \
-        lsb-release \
         xfonts-75dpi xfonts-base libx11-6 libxcb1 libxext6 libxrender1 libsqlite3-dev\
         tzdata && \
-    locale-gen en_US.UTF-8 && \
-    locale-gen en_GB.UTF-8 && \
+    sed -i \
+        -e 's/^# *en_US\.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/' \
+        -e 's/^# *en_GB\.UTF-8 UTF-8$/en_GB.UTF-8 UTF-8/' \
+        /etc/locale.gen && \
+    locale-gen && \
     update-locale LANG="en_US.UTF-8" && update-locale LANGUAGE="en_US:en" && \
     install -d -m 0755 /etc/apt/keyrings && \
     wget --quiet -O /etc/apt/keyrings/pgdg.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc && \
-    echo "deb [signed-by=/etc/apt/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    echo "deb [signed-by=/etc/apt/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt/ bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
     apt-get update -qq && \
-    apt-get install -qqq -y --no-install-recommends --auto-remove $ODOOD_DEPENDENCIES && \
-    wget --quiet -O /tmp/wkhtmltopdf.deb https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.jammy_$(dpkg --print-architecture).deb && \
-        dpkg -i /tmp/wkhtmltopdf.deb && \
+    apt-get install -qqq -y --no-install-recommends --auto-remove \
+        $(printf '%s\n' "$ODOOD_DEPENDENCIES" | tr ' ' '\n' | grep -Ev '^(python3(-|$)|postgresql-client$)') \
+        postgresql-client-18 && \
+    python3 -m pip install --no-cache-dir "virtualenv>=20.26.6" && \
+    pg_dump --version | grep -qE '^pg_dump \(PostgreSQL\) 18\.' && \
+    wget --quiet -O /tmp/wkhtmltopdf.deb https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_$(dpkg --print-architecture).deb && \
+        apt-get install -qqq -y --no-install-recommends /tmp/wkhtmltopdf.deb && \
+        wkhtmltopdf --version | grep -q "with patched qt" && \
+        printf '%s\n' '<html><body>PDF smoke test</body></html>' > /tmp/wkhtmltopdf-test.html && \
+        wkhtmltopdf /tmp/wkhtmltopdf-test.html /tmp/wkhtmltopdf-test.pdf && \
+        test -s /tmp/wkhtmltopdf-test.pdf && \
+        rm -f /tmp/wkhtmltopdf-test.html /tmp/wkhtmltopdf-test.pdf && \
         rm -f /tmp/wkhtmltopdf.deb && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /root/.cache/pip/*
@@ -77,5 +88,6 @@ RUN wget --quiet -O /tmp/google-chrome.deb \
         https://dl.google.com/linux/direct/google-chrome-stable_current_$(dpkg --print-architecture).deb && \
     apt-get update -qq && \
     apt-get install -qqq -y --no-install-recommends /tmp/google-chrome.deb && \
+    google-chrome --version && \
     rm -f /tmp/google-chrome.deb && \
     rm -rf /var/lib/apt/lists/*

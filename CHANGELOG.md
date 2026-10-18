@@ -25,7 +25,9 @@
 
 ### Changed
 
-- Docker images are based on Ubuntu 26.04 (was 24.04).
+- Docker images are based on the digest-pinned official Python 3.12 slim image
+  for Debian Bookworm; matching Bookworm wkhtmltopdf and PostgreSQL 18 client
+  packages are used.
 - Odoo 19 accepts system Python 3.13. System Python 3.14 is not used for
   Odoo 18 or 19, as parts of the addon ecosystem break on it (e.g. OCA
   `server_environment`); odood installs a suitable Python instead.

@@ -35,7 +35,13 @@ ghcr.io/katyukha/odood/odoo/{serie}:{tag}
 ```
 
 Available series: `16.0`, `17.0`, `18.0`, `19.0` (there is no `20.0` image yet).
-The images are based on Ubuntu 26.04.
+The images are based on the official Python 3.12 slim image for Debian Bookworm.
+Odood selects or installs a Python version compatible with the requested Odoo series.
+The image includes PostgreSQL 18 client tools; use a PostgreSQL 18 server for
+backup/restore compatibility.
+The examples mount PostgreSQL 18's data root at `/var/lib/postgresql`.
+When upgrading an existing PostgreSQL 16 deployment, back up and restore into a
+new PostgreSQL 18 volume; do not switch the server image tag in place.
 
 Each Odood release publishes these tags, which follow the **Odood** version, not Odoo's:
 - `latest` — the latest stable release;
@@ -72,7 +78,7 @@ volumes:
 
 services:
     odood-example-db:
-        image: postgres:16
+        image: postgres:18
         container_name: odood-example-db
         environment:
             # Credentials must match ODOOD_OPT_DB_USER / ODOOD_OPT_DB_PASSWORD below.
@@ -82,7 +88,7 @@ services:
             # all Odoo databases must be created by Odoo itself.
             POSTGRES_DB: postgres
         volumes:
-            - odood-example-db-data:/var/lib/postgresql/data
+            - odood-example-db-data:/var/lib/postgresql
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U odoo"]
             interval: 10s
@@ -165,14 +171,14 @@ volumes:
 
 services:
     odood-example-ssl-db:
-        image: postgres:16
+        image: postgres:18
         container_name: odood-example-ssl-db
         environment:
             POSTGRES_USER: odoo
             POSTGRES_PASSWORD: odoo-db-pass
             POSTGRES_DB: postgres
         volumes:
-            - odood-example-ssl-db-data:/var/lib/postgresql/data
+            - odood-example-ssl-db-data:/var/lib/postgresql
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U odoo"]
             interval: 10s
