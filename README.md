@@ -223,12 +223,26 @@ Odood has prebuilt docker images, that could be used to easily run Odoo powered 
 
 See examples directory for more details.
 
+Create a protected file for the Odoo database-manager master password, then export its path
+before starting Compose:
+
+```bash
+install -d -m 700 "$HOME/.secrets"
+umask 077
+openssl rand -hex 32 > "$HOME/.secrets/odoo-admin-passwd"
+export ODOOD_ADMIN_PASSWD_FILE="$HOME/.secrets/odoo-admin-passwd"
+```
+
 Example `docker-compose.yml`:
 
 ```yml
 volumes:
     odood-example-db-data:
     odood-example-odoo-data:
+
+secrets:
+    odoo_admin_passwd:
+        file: ${ODOOD_ADMIN_PASSWD_FILE:?Set path to Odoo master-password secret file}
 
 services:
     odood-example-db:
@@ -262,13 +276,15 @@ services:
             ODOOD_OPT_DB_HOST: odood-example-db
             ODOOD_OPT_DB_USER: odoo
             ODOOD_OPT_DB_PASSWORD: odoo-db-pass
-            ODOOD_OPT_ADMIN_PASSWD: admin
+            ODOOD_OPT_ADMIN_PASSWD_FILE: /run/secrets/odoo_admin_passwd
             ODOOD_OPT_WORKERS: "2"
             ODOOD_OPT_PROXY_MODE: "True"
         ports:
             - "8069:8069"
         volumes:
             - odood-example-odoo-data:/opt/odoo/data
+        secrets:
+            - odoo_admin_passwd
         restart: unless-stopped
 ```
 

@@ -42,6 +42,19 @@ backup/restore compatibility.
 The examples mount PostgreSQL 18's data root at `/var/lib/postgresql`.
 When upgrading an existing PostgreSQL 16 deployment, back up and restore into a
 new PostgreSQL 18 volume; do not switch the server image tag in place.
+Production images require the Odoo database-manager master password at runtime.
+The examples read it from a Compose secret file instead of baking it into the
+image or putting the value directly in the Compose file. Before starting,
+provide `ODOOD_ADMIN_PASSWD_FILE` as the path to a file containing a unique,
+strong password; protect that file with restrictive permissions.
+For example:
+
+```bash
+install -d -m 700 "$HOME/.secrets"
+umask 077
+openssl rand -hex 32 > "$HOME/.secrets/odoo-admin-passwd"
+export ODOOD_ADMIN_PASSWD_FILE="$HOME/.secrets/odoo-admin-passwd"
+```
 
 Each Odood release publishes these tags, which follow the **Odood** version, not Odoo's:
 - `latest` — the latest stable release;
@@ -66,6 +79,7 @@ It corresponds to the example in [`examples/docker-compose/odoo-and-db/`](https:
 # Runs Odoo 18 with PostgreSQL behind a Traefik reverse proxy over plain HTTP.
 #
 # Usage:
+#   export ODOOD_ADMIN_PASSWD_FILE="$HOME/.secrets/odoo-admin-passwd"
 #   docker compose up -d
 #
 # Odoo will be available at http://localhost
@@ -75,6 +89,10 @@ volumes:
     odood-example-db-data:
     odood-example-odoo-data:
     odood-example-odoo-backups:
+
+secrets:
+    odoo_admin_passwd:
+        file: ${ODOOD_ADMIN_PASSWD_FILE:?Set path to Odoo master-password secret file}
 
 services:
     odood-example-db:
@@ -121,8 +139,7 @@ services:
             ODOOD_OPT_DB_HOST: odood-example-db
             ODOOD_OPT_DB_USER: odoo
             ODOOD_OPT_DB_PASSWORD: odoo-db-pass
-            # Odoo master password used to create/drop databases via the web UI.
-            ODOOD_OPT_ADMIN_PASSWD: admin
+            ODOOD_OPT_ADMIN_PASSWD_FILE: /run/secrets/odoo_admin_passwd
             # Number of Odoo worker processes. Increase for higher load.
             # Rule of thumb: (CPU cores * 2) + 1, minimum 2.
             ODOOD_OPT_WORKERS: "2"
@@ -132,6 +149,8 @@ services:
             - odood-example-odoo-data:/opt/odoo/data
             # Backups made by `odood db backup`.
             - odood-example-odoo-backups:/opt/odoo/backups
+        secrets:
+            - odoo_admin_passwd
         restart: unless-stopped
 
     odood-example-traefik:
@@ -168,6 +187,10 @@ volumes:
     odood-example-ssl-db-data:
     odood-example-ssl-odoo-data:
     odood-example-ssl-odoo-backups:
+
+secrets:
+    odoo_admin_passwd:
+        file: ${ODOOD_ADMIN_PASSWD_FILE:?Set path to Odoo master-password secret file}
 
 services:
     odood-example-ssl-db:
@@ -209,12 +232,14 @@ services:
             ODOOD_OPT_DB_HOST: odood-example-ssl-db
             ODOOD_OPT_DB_USER: odoo
             ODOOD_OPT_DB_PASSWORD: odoo-db-pass
-            ODOOD_OPT_ADMIN_PASSWD: admin
+            ODOOD_OPT_ADMIN_PASSWD_FILE: /run/secrets/odoo_admin_passwd
             ODOOD_OPT_WORKERS: "2"
             ODOOD_OPT_PROXY_MODE: "True"
         volumes:
             - odood-example-ssl-odoo-data:/opt/odoo/data
             - odood-example-ssl-odoo-backups:/opt/odoo/backups
+        secrets:
+            - odoo_admin_passwd
         restart: unless-stopped
 
     odood-example-ssl-traefik:
@@ -351,6 +376,10 @@ Pass the image reference as an environment variable so it can be updated at upgr
 without editing the Compose file directly:
 
 ```yaml
+secrets:
+  odoo_admin_passwd:
+    file: ${ODOOD_ADMIN_PASSWD_FILE:?Set path to Odoo master-password secret file}
+
 services:
   odoo:
     image: ${ODOO_IMAGE}   # e.g. ghcr.io/my-org/my-assembly:18.0.1.2.3
@@ -361,12 +390,14 @@ services:
       ODOOD_OPT_DB_HOST: db
       ODOOD_OPT_DB_USER: odoo
       ODOOD_OPT_DB_PASSWORD: odoo-db-pass
-      ODOOD_OPT_ADMIN_PASSWD: admin
+      ODOOD_OPT_ADMIN_PASSWD_FILE: /run/secrets/odoo_admin_passwd
       ODOOD_OPT_WORKERS: "2"
       ODOOD_OPT_PROXY_MODE: "True"
     volumes:
       - odoo-data:/opt/odoo/data
       - odoo-backups:/opt/odoo/backups
+    secrets:
+      - odoo_admin_passwd
     restart: unless-stopped
 ```
 

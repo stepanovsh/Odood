@@ -17,6 +17,10 @@ volumes:
     odood-example-ssl-odoo-data:
     odood-example-ssl-odoo-backups:
 
+secrets:
+    odoo_admin_passwd:
+        file: ${ODOOD_ADMIN_PASSWD_FILE:?Set path to Odoo master-password secret file}
+
 services:
     odood-example-ssl-db:
         image: postgres:18
@@ -64,8 +68,7 @@ services:
             ODOOD_OPT_DB_HOST: odood-example-ssl-db
             ODOOD_OPT_DB_USER: odoo
             ODOOD_OPT_DB_PASSWORD: odoo-db-pass
-            # Odoo master password used to create/drop databases via the web UI.
-            ODOOD_OPT_ADMIN_PASSWD: admin
+            ODOOD_OPT_ADMIN_PASSWD_FILE: /run/secrets/odoo_admin_passwd
             # Number of Odoo worker processes. Increase for higher load.
             # Rule of thumb: (CPU cores * 2) + 1, minimum 2.
             ODOOD_OPT_WORKERS: "2"
@@ -75,6 +78,8 @@ services:
             - odood-example-ssl-odoo-data:/opt/odoo/data
             # Backups made by `odood db backup`.
             - odood-example-ssl-odoo-backups:/opt/odoo/backups
+        secrets:
+            - odoo_admin_passwd
         restart: unless-stopped
 
     odood-example-ssl-traefik:

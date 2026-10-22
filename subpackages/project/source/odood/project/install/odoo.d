@@ -198,6 +198,14 @@ void installOdoo(in Project project) {
             project.odoo.path.join("requirements.txt").writeFile(requirements_content);
         }
 
+        if (project.venv.py_version >= Version(3, 10, 0) && project.odoo.serie <= 19) {
+            info("Patching Odoo requirements.txt to use a Pillow release with security fixes...");
+            auto requirements_content = project.odoo.path.join("requirements.txt").readFileText()
+                .replaceAll(
+                    regex(r"(?im)^Pillow==[^\s;]+", "g"),
+                    "Pillow==13.0.0");
+            project.odoo.path.join("requirements.txt").writeFile(requirements_content);
+        }
 
         /* Patch requirements txt to avoid using libsass==0.22.0 on
          * Python >= 3.14: its setup.py reads `ast.Constant.s`, removed in

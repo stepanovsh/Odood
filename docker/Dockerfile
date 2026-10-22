@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 AS base
+FROM python:3.12-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70 AS base
 
 ARG ODOO_VERSION
 ARG ODOOD_DEPENDENCIES
@@ -30,7 +30,11 @@ RUN apt-get update -qq && \
     apt-get install -qqq -y --no-install-recommends --auto-remove \
         $(printf '%s\n' "$ODOOD_DEPENDENCIES" | tr ' ' '\n' | grep -Ev '^(python3(-|$)|postgresql-client$)') \
         postgresql-client-18 && \
+    python3 -m pip install --no-cache-dir \
+        --cert /etc/ssl/certs/ca-certificates.crt \
+        "pip==26.2.2" && \
     python3 -m pip install --no-cache-dir "virtualenv>=20.26.6" && \
+    python3 -c 'import pip._vendor.certifi as c; assert "emSign ECC Root CA - G3" not in open(c.where()).read()' && \
     pg_dump --version | grep -qE '^pg_dump \(PostgreSQL\) 18\.' && \
     wget --quiet -O /tmp/wkhtmltopdf.deb https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_$(dpkg --print-architecture).deb && \
         apt-get install -qqq -y --no-install-recommends /tmp/wkhtmltopdf.deb && \
@@ -48,9 +52,14 @@ ENV LANG="en_US.UTF-8" LANGUAGE="en_US:en" LC_ALL="en_US.UTF-8"
 
 COPY ./bin/${TARGETARCH}/odood /usr/bin/odood
 COPY ./bin/${TARGETARCH}/odood.bash /etc/bash_completion.d/odood.bash
+# Remove the deploy-generated master password in the same layer that created it.
 
 RUN /usr/bin/odood deploy -v "$ODOO_VERSION" --supervisor=odood --log-to-stderr --db-password=odoo \
         --server-user-uid="$ODOOD_SERVER_USER_UID" --server-user-gid="$ODOOD_SERVER_USER_GID" && \
+    /opt/odoo/venv/bin/python -c 'import PIL; assert PIL.__version__ == "13.0.0"' && \
+    /opt/odoo/venv/bin/python -c 'import pip._vendor.certifi as c; assert "emSign ECC Root CA - G3" not in open(c.where()).read()' && \
+    sed -i '/^[[:space:]]*admin_passwd[[:space:]]*=/d' /opt/odoo/conf/odoo.conf && \
+    ! grep -q 'admin_passwd' /opt/odoo/conf/odoo.conf && \
     rm -rf /root/.cache/pip/*
 
 WORKDIR /opt/odoo
@@ -69,8 +78,12 @@ CMD ["/usr/bin/odood", "--config-from-env", "server", "run", "--wait-pg"]
 # Production image (default target): adds a HEALTHCHECK for orchestrators.
 FROM base AS production
 
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/odood-entrypoint
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD odood server healthcheck -t 9
+
+ENTRYPOINT ["/usr/local/bin/odood-entrypoint"]
 
 
 # CI image: no HEALTHCHECK (disposable test runner), with the dev/lint/test
